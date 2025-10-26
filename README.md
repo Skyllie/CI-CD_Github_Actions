@@ -137,5 +137,8 @@ Example response:
 }
 ```
 
-
+## Features
+- ✅ Automated CI/CD with GitHub Actions
+- ✅ Python 3.10 and 3.11 support
+- ✅ Unit tests with pytest
 
