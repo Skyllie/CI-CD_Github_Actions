@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest flake8
+      
+      - name: Lint
+        run: flake8 . --exclude=venv,.git --select=E9,F63,F7,F82
+        continue-on-error: true
+      
+      - name: Build
+        run: |
+          python -m py_compile app.py
+          python -m py_compile db.py
+      
+      - name: Test database
+        run: |
+          python db.py --add_default_data
+          python db.py --print_all_data
+      
+      - name: Run tests
+        run: |
+          mkdir -p tests
+          cat > tests/test_app.py << 'EOF'
+          import sys
+          import os
+          
+          sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+          
+          def test_imports():
+              import app
+              import db
+              assert app is not None
+              assert db is not None
+          
+          def test_flask():
+              import flask
+              assert flask.__version__ is not None
+          EOF
+          
+          pytest tests/test_app.py -v
+
+  pr-check:
+    if: github.event_name == 'pull_request'
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "✅ PR ready!"
